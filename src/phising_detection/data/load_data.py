@@ -2,7 +2,7 @@
 
 import pandas as pd
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
 
 
 def load_phishing_urls(
@@ -39,8 +39,6 @@ def load_phishing_urls(
         'url': urls,
         'is_phishing': int(is_phishing)
     })
-
-
 
     return df
 

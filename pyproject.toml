@@ -6,11 +6,15 @@ requires-python = ">=3.12"
 dependencies = [
     "pandas>=2.3.3",
     "pandas-stubs==2.3.3.251219",
+    "python-dotenv>=1.0.0",
+    "requests>=2.32.5",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
+    "pytest-mock>=3.15.1",
+    "responses>=0.25.8",
 ]
 
