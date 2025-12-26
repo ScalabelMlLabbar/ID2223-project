@@ -106,3 +106,43 @@ class TestLoadPhishingUrls:
 
         assert df['url_id'].is_unique
         assert len(df['url_id'].unique()) == len(df)
+
+
+class TestLoadLegitimateUrls:
+    """Tests for loading legitimate URLs using load_phishing_urls with is_phishing=False."""
+
+    def test_load_legitimate_urls_basic(self, temp_legitimate_file, sample_legitimate_urls):
+        """Test basic loading of legitimate URLs."""
+        df = load_phishing_urls(temp_legitimate_file, is_phishing=False)
+
+        # Check DataFrame shape
+        assert len(df) == len(sample_legitimate_urls)
+        assert df.shape[1] == 3  # url_id, url, is_phishing
+
+        # Check all are labeled as non-phishing
+        assert all(df['is_phishing'] == 0)
+
+    def test_load_legitimate_urls_content(self, temp_legitimate_file, sample_legitimate_urls):
+        """Test that legitimate URLs are loaded correctly."""
+        df = load_phishing_urls(temp_legitimate_file, is_phishing=False)
+
+        # Check URLs match
+        assert df['url'].tolist() == sample_legitimate_urls
+
+        # Check url_ids are sequential
+        assert df['url_id'].tolist() == list(range(len(sample_legitimate_urls)))
+
+    def test_combined_phishing_and_legitimate(
+        self, temp_phishing_file, temp_legitimate_file
+    ):
+        """Test loading and combining phishing and legitimate URLs."""
+        phishing_df = load_phishing_urls(temp_phishing_file, is_phishing=True)
+        legitimate_df = load_phishing_urls(temp_legitimate_file, is_phishing=False)
+
+        # Combine datasets
+        combined_df = pd.concat([phishing_df, legitimate_df], ignore_index=True)
+
+        # Check that we have both types
+        assert (combined_df['is_phishing'] == 1).sum() == len(phishing_df)
+        assert (combined_df['is_phishing'] == 0).sum() == len(legitimate_df)
+        assert len(combined_df) == len(phishing_df) + len(legitimate_df)
