@@ -4,7 +4,11 @@ import os
 import time
 from typing import Dict, Any, Optional
 
+from dotenv import load_dotenv
 import requests
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 class URLScanError(Exception):

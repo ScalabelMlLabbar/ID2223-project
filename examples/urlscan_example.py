@@ -18,12 +18,12 @@ def main():
         client = URLScanClient()
 
         # Example URL to scan
-        test_url = "https://example.com"
+        test_url = "http://000ogxd.wcomhost.com/logssss/customer_center/customer-idpp00c196/myaccount/signin"
 
         print(f"Submitting URL for scanning: {test_url}")
 
         # Option 1: Submit and get UUID for later retrieval
-        submission = client.submit_url(
+        """submission = client.submit_url(
             url=test_url,
             visibility="public",
             tags=["example", "test"]
@@ -36,17 +36,17 @@ def main():
         print(f"  UUID: {uuid}")
         print(f"  Results URL: {result_url}")
         print(f"\nYou can retrieve results later using:")
-        print(f"  client.get_result('{uuid}')")
+        print(f"  client.get_result('{uuid}')")"""
 
         # Option 2: Submit and wait for results (uncomment to use)
-        # print("\n\nAlternatively, submit and wait for results:")
-        # result = client.submit_and_wait(
-        #     url=test_url,
-        #     visibility="public",
-        #     max_wait=60,
-        #     poll_interval=5
-        # )
-        # print(f"Scan completed! Page title: {result.get('page', {}).get('title')}")
+        print("\n\nAlternatively, submit and wait for results:")
+        result = client.submit_and_wait(
+            url=test_url,
+            visibility="public",
+            max_wait=60,
+            poll_interval=5
+        )
+        print(f"Scan completed! Page title: {result.get('page', {}).get('title')}")
 
         # Option 3: Search for existing scans
         print("\n\nSearching for existing scans of this domain:")
