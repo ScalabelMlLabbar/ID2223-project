@@ -22,7 +22,7 @@ def load_phishing_urls(
     """
     if file_path is None:
         # Default to the file in the same directory as this module
-        file_path = Path(__file__).parent / "phishing-links-ACTIVE.txt"
+        file_path = Path(__file__).parent / "data_files" /"phishing-links-ACTIVE.txt"
     else:
         file_path = Path(file_path)
 
