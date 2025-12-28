@@ -10,7 +10,7 @@ sys.path.insert(0, str(project_root / "src"))
 from phising_detection.data import load_phishing_urls
 
 # Load phishing URLs from the file
-df = load_phishing_urls("../src/phising_detection/data/phishing-links-ACTIVE.txt")
+df = load_phishing_urls("../src/phising_detection/data/data_files/phishing-links-ACTIVE.txt")
 
 # Display basic information
 print(f"Loaded {len(df)} phishing URLs")
