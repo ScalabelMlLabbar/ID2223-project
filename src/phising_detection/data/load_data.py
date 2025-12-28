@@ -42,4 +42,24 @@ def load_phishing_urls(
 
     return df
 
+def convert_csv_to_urls(csv_path: Union[str, Path], output_path: Union[str, Path]) -> None:
+    """
+    Convert a CSV file containing URLs to a text file with one URL per line.
+
+    Args:
+        csv_path: Path to the input CSV file.
+        output_path: Path to the output text file.
+    """
+    csv_path = Path(csv_path)
+    output_path = Path(output_path)
+
+    if not csv_path.exists():
+        raise FileNotFoundError(f"CSV file not found: {csv_path}")
+
+    # Read CSV and extract domains
+    df = pd.read_csv(csv_path, header=None, names=['rank', 'domain'])
+
+    # Write domains to text file
+    output_path.write_text('\n'.join(df['domain']))
+
 
