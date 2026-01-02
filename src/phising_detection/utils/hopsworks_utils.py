@@ -69,10 +69,6 @@ def get_or_create_feature_group(
     project,
     name: str,
     version: int = 1,
-    description: str = "",
-    primary_key: list = None,
-    event_time: Optional[str] = None,
-    online_enabled: bool = False
 ):
     """
     Get existing feature group or create new one if it doesn't exist.
