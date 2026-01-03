@@ -69,7 +69,11 @@ def request_phishing_urls(links):
 
 
     # Create DataFrame
-    df = pd.DataFrame(all_urls, columns=["Phishing_URL"])
+    df = pd.DataFrame({
+    'url_id': range(len(all_urls)),
+    'url': all_urls,
+    'is_phishing': 0  # 0 for legitimate URLs
+})
     
     return df
 
@@ -87,9 +91,9 @@ def load_into_hopswork(dataframe):
         project=project,
         df=dataframe,
         feature_group_name="phishing_urls",
-        version=1,
+        version=2,
         description="A dataframe with all the active Phishing URLs collected from the updated Phishing database",
-        primary_key= ["phishing_url"],
+        primary_key= ["url_id"],
         event_time= None,
         online_enabled=True
         )
