@@ -5,7 +5,7 @@ description = "Add your description here"
 requires-python = ">=3.12"
 dependencies = [
     "confluent-kafka>=2.3.0",
-    "hopsworks>=4.2.0",
+    "hopsworks==4.2.*",
     "pandas>=2.1.0,<2.2.0",
     "python-dotenv>=1.0.0",
     "pyarrow>=14.0.0",
