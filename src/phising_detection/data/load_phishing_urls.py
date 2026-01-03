@@ -72,7 +72,7 @@ def request_phishing_urls(links):
     df = pd.DataFrame({
     'url_id': range(len(all_urls)),
     'url': all_urls,
-    'is_phishing': 0  # 0 for legitimate URLs
+    'is_phishing': 1  # 0 for legitimate URLs
 })
     
     return df
