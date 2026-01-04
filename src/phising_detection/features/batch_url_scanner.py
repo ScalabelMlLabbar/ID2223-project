@@ -691,5 +691,6 @@ if __name__ == "__main__":
         output_fg_name=args.output_fg_name,
         output_version=args.output_version,
         batch_size=args.batch_size,
-        sample_size=args.sample_size
+        sample_size=args.sample_size,
+        max_batches=args.max_batches
     )
