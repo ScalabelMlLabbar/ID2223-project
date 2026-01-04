@@ -87,7 +87,7 @@ jobs:
           HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
           HOPSWORKS_PROJECT_NAME: ${{ secrets.HOPSWORKS_PROJECT_NAME }}
         run: |
-          uv run python src/phising_detection/features/batch_url_scanner.py \
+          uv run python -m src.phising_detection.features.batch_url_scanner \
             --fg1-name phishing_urls \
             --fg1-version 2 \
             --fg2-name legit_urls_before_scan \
