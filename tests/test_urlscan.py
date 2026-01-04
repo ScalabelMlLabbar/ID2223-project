@@ -6,9 +6,7 @@ from unittest.mock import patch
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from phising_detection.api import URLScanClient, URLScanError
+from src.phising_detection.utils.urlscan import URLScanClient, URLScanError
 
 
 class TestURLScanClient:

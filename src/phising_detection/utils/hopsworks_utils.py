@@ -218,3 +218,88 @@ def create_feature_view(
 
     logger.info(f"Successfully created feature view: {name}")
     return fv
+
+
+def save_model_to_registry(
+    project,
+    model,
+    model_name: str,
+    metrics: dict = None,
+    description: str = "",
+    model_schema: dict = None,
+    scaler=None,
+    feature_names: list = None
+):
+    """
+    Save a trained model to Hopsworks Model Registry with all artifacts.
+
+    Args:
+        project: Hopsworks project object
+        model: Trained model object
+        model_name: Name for the model in registry
+        metrics: Dictionary of model metrics
+        description: Model description
+        model_schema: Optional model schema
+        scaler: Optional scaler object to save with model
+        feature_names: Optional list of feature names
+
+    Returns:
+        Model registry object
+    """
+    import joblib
+    import os
+    import tempfile
+
+    logger.info(f"Saving model to Hopsworks Model Registry: {model_name}")
+
+    # Get model registry
+    mr = project.get_model_registry()
+
+    # Create temporary directory for model artifacts
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Save model using joblib
+        model_path = os.path.join(tmpdir, "model.pkl")
+        joblib.dump(model, model_path)
+        logger.info(f"Model saved to temporary path: {model_path}")
+
+        # Save scaler if provided
+        if scaler is not None:
+            scaler_path = os.path.join(tmpdir, "scaler.pkl")
+            joblib.dump(scaler, scaler_path)
+            logger.info(f"Scaler saved to temporary path: {scaler_path}")
+
+        # Save feature names if provided
+        if feature_names is not None:
+            feature_names_path = os.path.join(tmpdir, "feature_names.txt")
+            with open(feature_names_path, 'w') as f:
+                f.write('\n'.join(feature_names))
+            logger.info(f"Feature names saved to temporary path: {feature_names_path}")
+
+        # Save hyperparameters from description if they exist
+        if description and "Best Parameters:" in description:
+            import json
+            # Try to extract and save params as JSON for easier loading
+            params_path = os.path.join(tmpdir, "hyperparameters.txt")
+            with open(params_path, 'w') as f:
+                f.write(description)
+            logger.info(f"Hyperparameters saved to temporary path: {params_path}")
+
+        # Create model in registry
+        try:
+            model_registry = mr.python.create_model(
+                name=model_name,
+                metrics=metrics or {},
+                description=description,
+                input_example=None,
+                model_schema=model_schema
+            )
+
+            # Save all model artifacts (model, scaler, feature_names)
+            model_registry.save(tmpdir)
+            logger.info(f"Successfully saved model '{model_name}' with all artifacts to Model Registry")
+
+            return model_registry
+
+        except Exception as e:
+            logger.error(f"Failed to save model to registry: {e}")
+            raise

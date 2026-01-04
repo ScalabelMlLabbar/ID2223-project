@@ -1,0 +1,83 @@
+name: Train Final Model
+
+on:
+  workflow_dispatch:  # Manual trigger only
+    inputs:
+      model_type:
+        description: 'Model to train'
+        required: true
+        type: choice
+        options:
+          - Random Forest
+          - Gradient Boosting
+          - Logistic Regression
+        default: 'Random Forest'
+      cv_folds:
+        description: 'Number of cross-validation folds'
+        required: false
+        type: number
+        default: 10
+      n_iter:
+        description: 'Number of RandomizedSearchCV iterations'
+        required: false
+        type: number
+        default: 100
+      registry_name:
+        description: 'Model name in Hopsworks registry'
+        required: false
+        type: string
+        default: 'phishing_detector'
+
+jobs:
+  train-model:
+    name: Train and Upload Model
+    runs-on: ubuntu-latest
+    timeout-minutes: 120  # 2 hours max for extensive hyperparameter search
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: true  # Pull Git LFS files if needed
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Train model with extensive hyperparameter search
+        env:
+          HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
+          HOPSWORKS_PROJECT: ${{ secrets.HOPSWORKS_PROJECT_NAME }}
+        run: |
+          uv run python src/phising_detection/models/train_final_model.py \
+            --model "${{ github.event.inputs.model_type }}" \
+            --cv-folds ${{ github.event.inputs.cv_folds }} \
+            --n-iter ${{ github.event.inputs.n_iter }} \
+            --registry-name "${{ github.event.inputs.registry_name }}" \
+            --feature-group urlscan_features \
+            --feature-group-version 1
+
+      - name: Training Summary
+        if: success()
+        run: |
+          echo "✅ Model training completed successfully!"
+          echo "Model: ${{ github.event.inputs.model_type }}"
+          echo "CV Folds: ${{ github.event.inputs.cv_folds }}"
+          echo "Iterations: ${{ github.event.inputs.n_iter }}"
+          echo "Registry Name: ${{ github.event.inputs.registry_name }}"
+          echo "Model uploaded to Hopsworks Model Registry"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Model training failed!"
+          echo "Check the logs above for details"
