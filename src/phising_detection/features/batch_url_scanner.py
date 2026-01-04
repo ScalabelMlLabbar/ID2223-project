@@ -16,13 +16,11 @@ import argparse
 from typing import List, Dict, Any
 import pandas as pd
 
-# Add src folder to path
-src_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-sys.path.append(src_folder)
+from src.phising_detection.features.urlscan_features import extract_features_to_dataframe
+from src.phising_detection.utils.urlscan import URLScanClient, URLScanError
+import src.phising_detection.utils.hopsworks_utils as hw
 
-from api.urlscan import URLScanClient, URLScanError
-from features.urlscan_features import extract_features_to_dataframe
-from utils import hopsworks_utils as hw
+# Add src folder to path
 
 # Configure logging
 logging.basicConfig(

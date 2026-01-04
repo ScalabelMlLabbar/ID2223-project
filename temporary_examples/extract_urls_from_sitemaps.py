@@ -1,17 +1,13 @@
 """Extract URLs from legitimate domains using sitemaps and save to CSV."""
 
 import logging
-import sys
 from pathlib import Path
 import pandas as pd
 from datetime import datetime
 import json
 
-# Add src directory to Python path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root / "src"))
 
-from phising_detection.data.sitemap_parser import get_urls_from_sitemap
+from src.phising_detection.data.sitemap_parser import get_urls_from_sitemap
 
 # Configure logging
 logging.basicConfig(
