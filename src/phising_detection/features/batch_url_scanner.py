@@ -670,6 +670,12 @@ def parse_args():
         default=None,
         help="Number of samples from each input group (default: None = use all)"
     )
+    parser.add_argument(
+        "--max-batches",
+        type=int,
+        default=None,
+        help="Maximum number of batches to process (default: None = process all)"
+    )
 
     return parser.parse_args()
 
