@@ -85,35 +85,56 @@ def load_and_balance_feature_groups(
 def get_already_scanned_urls(
     project,
     feature_group_name: str,
-    version: int
+    version: int,
+    attempted_fg_name: str = None,
+    attempted_fg_version: int = 1
 ) -> set:
     """
-    Retrieve URLs that have already been scanned from output feature group.
+    Retrieve URLs that have already been scanned or attempted from feature groups.
 
     Args:
         project: Hopsworks project object
-        feature_group_name: Name of output feature group
+        feature_group_name: Name of output feature group (successful scans)
         version: Feature group version
+        attempted_fg_name: Name of attempted scans tracking feature group (optional)
+        attempted_fg_version: Version of attempted scans feature group
 
     Returns:
-        Set of URLs that have already been scanned (empty set if FG doesn't exist)
+        Set of URLs that have already been scanned or attempted (empty set if FG doesn't exist)
     """
+    all_attempted_urls = set()
+
+    # Check successful scans
     try:
-        logger.info(f"Checking for existing scans in {feature_group_name} v{version}")
+        logger.info(f"Checking for successful scans in {feature_group_name} v{version}")
         existing_df = hw.read_feature_group(project, feature_group_name, version)
 
         if 'url' in existing_df.columns:
             scanned_urls = set(existing_df['url'].dropna().unique())
-            logger.info(f"Found {len(scanned_urls)} already scanned URLs")
-            return scanned_urls
+            logger.info(f"Found {len(scanned_urls)} successfully scanned URLs")
+            all_attempted_urls.update(scanned_urls)
         else:
             logger.warning(f"Feature group exists but no 'url' column found")
-            return set()
 
     except Exception as e:
         logger.info(f"Output feature group not found or error reading it: {e}")
-        logger.info("Will scan all URLs")
-        return set()
+
+    # Check attempted scans (including failed ones)
+    if attempted_fg_name:
+        try:
+            logger.info(f"Checking for attempted scans in {attempted_fg_name} v{attempted_fg_version}")
+            attempted_df = hw.read_feature_group(project, attempted_fg_name, attempted_fg_version)
+
+            if 'url' in attempted_df.columns:
+                attempted_urls = set(attempted_df['url'].dropna().unique())
+                logger.info(f"Found {len(attempted_urls)} attempted URLs (including failures)")
+                all_attempted_urls.update(attempted_urls)
+
+        except Exception as e:
+            logger.info(f"Attempted scans feature group not found: {e}")
+
+    logger.info(f"Total URLs to skip (successful + attempted): {len(all_attempted_urls)}")
+    return all_attempted_urls
 
 
 def filter_already_scanned(
@@ -151,12 +172,61 @@ def filter_already_scanned(
     return filtered_df
 
 
+def record_attempted_scans(
+    project,
+    urls: List[str],
+    statuses: List[str],
+    uuids: List[str] = None,
+    feature_group_name: str = "attempted_scans",
+    version: int = 1
+):
+    """
+    Record attempted scans (both successful and failed) to prevent re-trying.
+
+    Args:
+        project: Hopsworks project object
+        urls: List of URLs that were attempted
+        statuses: List of status strings ('submitted', 'success', 'failed', 'timeout')
+        uuids: Optional list of scan UUIDs
+        feature_group_name: Name of tracking feature group
+        version: Feature group version
+    """
+    if not urls:
+        return
+
+    import datetime
+
+    # Create DataFrame of attempted scans
+    attempted_df = pd.DataFrame({
+        'url': urls,
+        'status': statuses,
+        'timestamp': [datetime.datetime.now()] * len(urls)
+    })
+
+    logger.info(f"Recording {len(attempted_df)} attempted scans")
+
+    try:
+        hw.upload_dataframe_to_feature_group(
+            project=project,
+            df=attempted_df,
+            feature_group_name=feature_group_name,
+            version=version,
+            description="Tracking of all attempted URL scans (successful and failed)",
+            primary_key=["url"],
+            online_enabled=False,
+            write_options={"wait_for_job": False}  # Don't wait, just record async
+        )
+        logger.info(f"Recorded attempted scans to {feature_group_name}")
+    except Exception as e:
+        logger.warning(f"Failed to record attempted scans: {e}")
+
+
 def submit_url_batch(
     client: URLScanClient,
     urls: List[str],
     visibility: str = "public",
     delay_between_submissions: float = 1.0
-) -> List[Dict[str, Any]]:
+) -> tuple[List[Dict[str, Any]], List[Dict[str, str]]]:
     """
     Submit a batch of URLs for scanning (without waiting for results).
 
@@ -167,9 +237,12 @@ def submit_url_batch(
         delay_between_submissions: Delay in seconds between submissions to respect rate limits
 
     Returns:
-        List of submission dictionaries with 'url', 'uuid', and 'api' fields
+        Tuple of (submissions list, permanent_failures list)
+        - submissions: List of submission dicts with 'url', 'uuid', 'api'
+        - permanent_failures: List of {'url', 'error'} for non-retryable failures
     """
     submissions = []
+    permanent_failures = []
 
     for i, url in enumerate(urls, 1):
         logger.info(f"Submitting URL {i}/{len(urls)}: {url}")
@@ -182,8 +255,17 @@ def submit_url_batch(
             logger.info(f"Successfully submitted: {url} (UUID: {submission.get('uuid')})")
 
         except URLScanError as e:
-            logger.error(f"Failed to submit {url}: {e}")
-            # Continue with next URL
+            error_msg = str(e).lower()
+            # Check if this is a permanent failure or temporary (rate limit)
+            if "rate limit" in error_msg or "429" in error_msg:
+                logger.warning(f"Rate limit hit for {url} - will retry later")
+                # Don't add to permanent failures - this can be retried
+            elif "bad request" in error_msg or "invalid" in error_msg:
+                logger.error(f"Permanent failure for {url}: {e}")
+                permanent_failures.append({'url': url, 'error': str(e)})
+            else:
+                logger.error(f"Failed to submit {url}: {e}")
+                # Unknown error - don't record as permanent for safety
             continue
 
         # Rate limiting: wait between submissions
@@ -191,7 +273,9 @@ def submit_url_batch(
             time.sleep(delay_between_submissions)
 
     logger.info(f"Submitted {len(submissions)}/{len(urls)} URLs successfully")
-    return submissions
+    if permanent_failures:
+        logger.info(f"Permanent failures: {len(permanent_failures)}")
+    return submissions, permanent_failures
 
 
 def retrieve_scan_results(
@@ -200,7 +284,7 @@ def retrieve_scan_results(
     max_wait: int = 300,
     poll_interval: int = 10,
     initial_wait: int = 30
-) -> List[Dict[str, Any]]:
+) -> tuple[List[Dict[str, Any]], List[Dict[str, str]]]:
     """
     Retrieve results for submitted scans.
 
@@ -212,12 +296,15 @@ def retrieve_scan_results(
         initial_wait: Time to wait before first poll attempt (seconds)
 
     Returns:
-        List of scan results (successful retrievals only)
+        Tuple of (results list, permanent_failures list)
+        - results: List of scan results (successful retrievals only)
+        - permanent_failures: List of {'url', 'error'} for non-retryable failures (excludes timeouts)
     """
     logger.info(f"Waiting {initial_wait} seconds for scans to complete...")
     time.sleep(initial_wait)
 
     results = []
+    permanent_failures = []
     pending_submissions = submissions.copy()
 
     start_time = time.time()
@@ -237,11 +324,16 @@ def retrieve_scan_results(
                 logger.info(f"Retrieved result for {url} (UUID: {uuid})")
 
             except URLScanError as e:
-                if "not found or not ready" in str(e):
+                error_msg = str(e).lower()
+                if "not found or not ready" in error_msg:
                     # Scan not ready yet, keep in pending list
                     still_pending.append(submission)
+                elif "dns" in error_msg or "domain" in error_msg or "unreachable" in error_msg:
+                    # Permanent DNS/domain failures - won't work on retry
+                    logger.error(f"Permanent failure for {url} (UUID: {uuid}): {e}")
+                    permanent_failures.append({'url': url, 'error': str(e)})
                 else:
-                    # Other error, log and skip
+                    # Other error - log but don't record as permanent for safety
                     logger.error(f"Failed to retrieve result for {url} (UUID: {uuid}): {e}")
 
         pending_submissions = still_pending
@@ -250,13 +342,16 @@ def retrieve_scan_results(
             logger.info(f"Still waiting for {len(pending_submissions)} scans. Waiting {poll_interval}s...")
             time.sleep(poll_interval)
 
+    # Timeouts are NOT permanent failures - scans might just be slow
     if pending_submissions:
-        logger.warning(f"Timeout: {len(pending_submissions)} scans did not complete in time")
+        logger.warning(f"Timeout: {len(pending_submissions)} scans did not complete in time (will retry later)")
         for submission in pending_submissions:
             logger.warning(f"  - {submission.get('url')} (UUID: {submission.get('uuid')})")
 
     logger.info(f"Successfully retrieved {len(results)}/{len(submissions)} scan results")
-    return results
+    if permanent_failures:
+        logger.info(f"Permanent failures: {len(permanent_failures)}")
+    return results, permanent_failures
 
 
 def process_and_upload_batch(
@@ -384,12 +479,14 @@ def main(
         sample_size=sample_size
     )
 
-    # Check for already scanned URLs
+    # Check for already scanned URLs (including failed attempts)
     logger.info("Checking for already scanned URLs...")
     scanned_urls = get_already_scanned_urls(
         project=project,
         feature_group_name=output_fg_name,
-        version=output_version
+        version=output_version,
+        attempted_fg_name="attempted_scans",  # Track failed scans too
+        attempted_fg_version=1
     )
 
     # Filter out already scanned URLs
@@ -430,7 +527,7 @@ def main(
 
         # Phase 1: Submit all URLs for scanning
         logger.info(f"Submitting {len(batch_urls)} URLs for scanning...")
-        submissions = submit_url_batch(
+        submissions, submission_failures = submit_url_batch(
             client=urlscan_client,
             urls=batch_urls,
             visibility="public",
@@ -440,7 +537,7 @@ def main(
         # Phase 2: Retrieve scan results
         if submissions:
             logger.info(f"Retrieving results for {len(submissions)} submitted scans...")
-            scan_results = retrieve_scan_results(
+            scan_results, retrieval_failures = retrieve_scan_results(
                 client=urlscan_client,
                 submissions=submissions,
                 max_wait=300,  # 5 minutes total wait time
@@ -449,6 +546,7 @@ def main(
             )
         else:
             scan_results = []
+            retrieval_failures = []
             logger.warning("No URLs were successfully submitted")
 
         # Process and upload results
@@ -463,6 +561,45 @@ def main(
             )
         else:
             logger.warning(f"No successful scans in batch {batch_num + 1}, skipping upload")
+
+        # Record ONLY successful scans and permanent failures (not timeouts or rate limits)
+        successful_urls = {result.get('original_url') or result.get('task', {}).get('url')
+                          for result in scan_results}
+
+        attempted_urls = []
+        attempted_statuses = []
+        attempted_uuids = []
+
+        # Record successful scans
+        for result in scan_results:
+            url = result.get('original_url') or result.get('task', {}).get('url')
+            uuid = result.get('task', {}).get('uuid')
+            attempted_urls.append(url)
+            attempted_statuses.append('success')
+            attempted_uuids.append(uuid)
+
+        # Record permanent failures from submission (invalid URLs, etc.)
+        for failure in submission_failures:
+            attempted_urls.append(failure['url'])
+            attempted_statuses.append('failed_permanent')
+            attempted_uuids.append(None)
+
+        # Record permanent failures from retrieval (DNS errors, etc.)
+        for failure in retrieval_failures:
+            attempted_urls.append(failure['url'])
+            attempted_statuses.append('failed_permanent')
+            attempted_uuids.append(None)
+
+        # Only record if we have something to record
+        if attempted_urls:
+            record_attempted_scans(
+                project=project,
+                urls=attempted_urls,
+                statuses=attempted_statuses,
+                uuids=attempted_uuids,
+                feature_group_name="attempted_scans",
+                version=1
+            )
 
         # Wait between batches to respect rate limits
         if batch_num < total_batches - 1:
