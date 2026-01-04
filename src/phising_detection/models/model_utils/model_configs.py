@@ -16,7 +16,7 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.dummy import DummyClassifier
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 
 logger = logging.getLogger(__name__)
 
@@ -218,3 +218,125 @@ def tune_hyperparameters(
     logger.info(f"Best CV score: {grid_search.best_score_:.4f}")
 
     return grid_search.best_estimator_
+
+
+def get_extensive_param_grids() -> Dict[str, Dict[str, list]]:
+    """
+    Get extensive hyperparameter grids for exhaustive search.
+
+    Returns:
+        Dictionary mapping model names to extensive parameter grids
+    """
+    param_grids = {
+        'Random Forest': {
+            'n_estimators': [50, 100, 200, 300],
+            'max_depth': [5, 10, 15, 20, None],
+            'min_samples_split': [2, 5, 10, 15],
+            'min_samples_leaf': [1, 2, 4],
+            'max_features': ['sqrt', 'log2', None]
+        },
+        'Gradient Boosting': {
+            'n_estimators': [50, 100, 200, 300],
+            'max_depth': [3, 5, 7, 9],
+            'learning_rate': [0.01, 0.05, 0.1, 0.2],
+            'subsample': [0.8, 0.9, 1.0],
+            'min_samples_split': [2, 5, 10]
+        },
+        'Logistic Regression': {
+            'C': [0.01, 0.1, 1.0, 10.0, 100.0],
+            'solver': ['lbfgs', 'liblinear', 'saga'],
+            'penalty': ['l2'],
+            'max_iter': [1000, 2000]
+        }
+    }
+    return param_grids
+
+
+def extensive_hyperparameter_search(
+    model_name: str,
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    cv_folds: int = 5,
+    n_iter: int = 50,
+    use_random_search: bool = True
+) -> Any:
+    """
+    Perform extensive hyperparameter search using RandomizedSearchCV.
+
+    Args:
+        model_name: Name of the model to tune
+        X_train: Training features
+        y_train: Training labels
+        cv_folds: Number of cross-validation folds
+        n_iter: Number of parameter settings sampled (for RandomizedSearchCV)
+        use_random_search: Use RandomizedSearchCV (True) or GridSearchCV (False)
+
+    Returns:
+        Best model from extensive search with full training results
+    """
+    logger.info("=" * 80)
+    logger.info(f"EXTENSIVE HYPERPARAMETER SEARCH for {model_name}")
+    logger.info("=" * 80)
+
+    # Get base model and extensive param grid
+    models = get_model_configs()
+    param_grids = get_extensive_param_grids()
+
+    if model_name not in models:
+        raise ValueError(f"Model {model_name} not found")
+
+    if model_name not in param_grids:
+        logger.warning(f"No extensive param grid for {model_name}")
+        return tune_hyperparameters(model_name, X_train, y_train, cv_folds)
+
+    base_model = models[model_name]
+    param_grid = param_grids[model_name]
+
+    # Choose search strategy
+    if use_random_search:
+        logger.info(f"Using RandomizedSearchCV with {n_iter} iterations")
+        search = RandomizedSearchCV(
+            base_model,
+            param_grid,
+            n_iter=n_iter,
+            cv=cv_folds,
+            scoring='accuracy',
+            n_jobs=-1,
+            verbose=2,
+            random_state=42,
+            return_train_score=True
+        )
+    else:
+        logger.info("Using GridSearchCV (exhaustive search)")
+        search = GridSearchCV(
+            base_model,
+            param_grid,
+            cv=cv_folds,
+            scoring='accuracy',
+            n_jobs=-1,
+            verbose=2,
+            return_train_score=True
+        )
+
+    # Fit search
+    logger.info(f"Starting extensive search with {cv_folds}-fold CV...")
+    search.fit(X_train, y_train)
+
+    # Log results
+    logger.info("\n" + "=" * 80)
+    logger.info("SEARCH RESULTS")
+    logger.info("=" * 80)
+    logger.info(f"Best parameters: {search.best_params_}")
+    logger.info(f"Best CV score: {search.best_score_:.4f}")
+    logger.info(f"Best estimator: {search.best_estimator_}")
+
+    # Log top 5 results
+    import pandas as pd
+    results_df = pd.DataFrame(search.cv_results_)
+    top_5 = results_df.nsmallest(5, 'rank_test_score')[
+        ['params', 'mean_test_score', 'std_test_score', 'rank_test_score']
+    ]
+    logger.info("\nTop 5 parameter combinations:")
+    logger.info("\n" + top_5.to_string(index=False))
+
+    return search.best_estimator_, search
