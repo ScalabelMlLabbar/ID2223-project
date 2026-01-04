@@ -12,6 +12,7 @@ import sys
 import os
 import logging
 import time
+import argparse
 from typing import List, Dict, Any
 import pandas as pd
 
@@ -612,15 +613,74 @@ def main(
     logger.info("=" * 80)
 
 
+def parse_args():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Batch URL scanning pipeline for phishing detection"
+    )
+
+    parser.add_argument(
+        "--fg1-name",
+        type=str,
+        default="phishing_urls",
+        help="Name of first feature group (default: phishing_urls)"
+    )
+    parser.add_argument(
+        "--fg1-version",
+        type=int,
+        default=2,
+        help="Version of first feature group (default: 2)"
+    )
+    parser.add_argument(
+        "--fg2-name",
+        type=str,
+        default="legitimate_urls",
+        help="Name of second feature group (default: legitimate_urls)"
+    )
+    parser.add_argument(
+        "--fg2-version",
+        type=int,
+        default=1,
+        help="Version of second feature group (default: 1)"
+    )
+    parser.add_argument(
+        "--output-fg-name",
+        type=str,
+        default="urlscan_features",
+        help="Name of output feature group (default: urlscan_features)"
+    )
+    parser.add_argument(
+        "--output-version",
+        type=int,
+        default=1,
+        help="Version of output feature group (default: 1)"
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=200,
+        help="Number of URLs to scan per batch (default: 200)"
+    )
+    parser.add_argument(
+        "--sample-size",
+        type=int,
+        default=None,
+        help="Number of samples from each input group (default: None = use all)"
+    )
+
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    # Example usage - adjust parameters as needed
+    args = parse_args()
+
     main(
-        fg1_name="phishing_urls",
-        fg1_version=2,
-        fg2_name="legit_urls_before_scan",
-        fg2_version=1,
-        output_fg_name="urlscan_features",
-        output_version=1,
-        batch_size=300,
-        sample_size=None  # Set to None to use all available data
+        fg1_name=args.fg1_name,
+        fg1_version=args.fg1_version,
+        fg2_name=args.fg2_name,
+        fg2_version=args.fg2_version,
+        output_fg_name=args.output_fg_name,
+        output_version=args.output_version,
+        batch_size=args.batch_size,
+        sample_size=args.sample_size
     )

@@ -1,0 +1,99 @@
+name: Scheduled Data Pipeline
+
+on:
+  schedule:
+    # Load phishing URLs every 24 hours (at midnight UTC)
+    - cron: '0 0 * * *'
+    # Run batch scanner every 2 hours
+    - cron: '0 */2 * * *'
+  workflow_dispatch:  # Allow manual triggering
+    inputs:
+      job_to_run:
+        description: 'Which job to run'
+        required: true
+        type: choice
+        options:
+          - load_phishing_urls
+          - batch_scanner
+          - both
+
+jobs:
+  load-phishing-urls:
+    name: Load Phishing URLs
+    runs-on: ubuntu-latest
+    # Only run on midnight schedule or manual trigger
+    if: |
+      github.event.schedule == '0 0 * * *' ||
+      github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.job_to_run == 'load_phishing_urls' || github.event.inputs.job_to_run == 'both')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: true  # Pull Git LFS files
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Load phishing URLs to Hopsworks
+        env:
+          HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
+          HOPSWORKS_PROJECT_NAME: ${{ secrets.HOPSWORKS_PROJECT_NAME }}
+        run: |
+          uv run python src/phising_detection/data/load_phishing_urls.py
+
+  batch-url-scanner:
+    name: Batch URL Scanner
+    runs-on: ubuntu-latest
+    # Run on 2-hour schedule or manual trigger
+    if: |
+      github.event.schedule == '0 */2 * * *' ||
+      github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.job_to_run == 'batch_scanner' || github.event.inputs.job_to_run == 'both')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run batch URL scanner
+        env:
+          URLSCAN_API_KEY: ${{ secrets.URLSCAN_API_KEY }}
+          HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
+          HOPSWORKS_PROJECT_NAME: ${{ secrets.HOPSWORKS_PROJECT_NAME }}
+        run: |
+          uv run python src/phising_detection/features/batch_url_scanner.py \
+            --fg1-name phishing_urls \
+            --fg1-version 2 \
+            --fg2-name legit_urls_before_scan \
+            --fg2-version 1 \
+            --output-fg-name urlscan_features \
+            --output-version 1 \
+            --batch-size 500 \
+            --sample-size 500
+        timeout-minutes: 30  # Prevent job from running too long
