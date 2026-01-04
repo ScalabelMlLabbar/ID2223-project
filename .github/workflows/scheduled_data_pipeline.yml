@@ -95,5 +95,5 @@ jobs:
             --output-fg-name urlscan_features \
             --output-version 1 \
             --batch-size 500 \
-            --max_batches 1
+            --max-batches 1
         timeout-minutes: 30  # Prevent job from running too long
