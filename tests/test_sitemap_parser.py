@@ -2,7 +2,7 @@
 
 import pytest
 import responses
-from phising_detection.data.sitemap_parser import (
+from src.phising_detection.data.sitemap_parser import (
     get_urls_from_sitemap,
     _get_sitemap_urls,
     _parse_sitemap,
