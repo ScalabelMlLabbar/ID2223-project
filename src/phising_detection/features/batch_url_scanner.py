@@ -440,7 +440,8 @@ def main(
     output_fg_name: str = "urlscan_features",
     output_version: int = 1,
     batch_size: int = 200,
-    sample_size: int = None
+    sample_size: int = None,
+    max_batches: int = None
 ):
     """
     Main orchestration function.
@@ -454,6 +455,7 @@ def main(
         output_version: Version of output feature group
         batch_size: Number of URLs to scan per batch
         sample_size: Number of samples from each input group (None = all)
+        max_batches: Maximum number of batches to process (None = all)
     """
     logger.info("=" * 80)
     logger.info("Starting batch URL scanning pipeline")
@@ -512,6 +514,9 @@ def main(
 
     # Process in batches
     for batch_num in range(total_batches):
+        if max_batches is not None and batch_num >= max_batches:
+            logger.info(f"Reached maximum batch limit of {max_batches}, stopping.")
+            break
         start_idx = batch_num * batch_size
         end_idx = min(start_idx + batch_size, total_urls)
 
