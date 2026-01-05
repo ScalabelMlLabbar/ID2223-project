@@ -8,13 +8,7 @@ import requests
 import pandas as pd
 import sys
 import os
-
-# Add the src folder to sys.path so Python can see utils
-src_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))  # go up one level from data/
-sys.path.append(src_folder)
-
-# Now import
-from utils import hopsworks_utils as hw
+from src.phising_detection.utils import hopsworks_utils as hw
 
 
 
