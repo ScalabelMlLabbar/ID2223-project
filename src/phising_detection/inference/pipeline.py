@@ -14,10 +14,10 @@ from typing import Tuple, Optional, Dict, Any
 import pandas as pd
 import joblib
 
-from phising_detection.utils.hopsworks_utils import connect_to_hopsworks
-from phising_detection.models.model_utils.data_prep import FEATURE_COLUMNS, CONTINUOUS_FEATURES
-from phising_detection.features.urlscan_features import extract_features
-from phising_detection.utils.urlscan import URLScanClient
+from ..utils.hopsworks_utils import connect_to_hopsworks
+from ..models.model_utils.data_prep import FEATURE_COLUMNS, CONTINUOUS_FEATURES
+from ..features.urlscan_features import extract_features
+from ..utils.urlscan import URLScanClient
 
 logger = logging.getLogger(__name__)
 
