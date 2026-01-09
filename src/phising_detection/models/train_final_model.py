@@ -15,8 +15,8 @@ import argparse
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-from src.phising_detection.models import data_prep, model_configs, evaluation
-from src.phising_detection.utils import hopsworks_utils as hw
+from phising_detection.models import data_prep, model_configs, evaluation
+from phising_detection.utils import hopsworks_utils as hw
 
 # Configure logging
 logging.basicConfig(

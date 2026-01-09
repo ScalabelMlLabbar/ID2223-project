@@ -9,10 +9,10 @@ import os
 import logging
 
 
-from src.phising_detection.utils import hopsworks_utils as hw
-from src.phising_detection.models import data_prep
-from src.phising_detection.models import model_configs
-from src.phising_detection.models import evaluation
+from phising_detection.utils import hopsworks_utils as hw
+from phising_detection.models import data_prep
+from phising_detection.models import model_configs
+from phising_detection.models import evaluation
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
