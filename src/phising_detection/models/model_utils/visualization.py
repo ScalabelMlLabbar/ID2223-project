@@ -9,6 +9,8 @@ This module provides:
 
 import logging
 from typing import Dict, Any
+
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -99,7 +101,7 @@ def plot_confusion_matrices(
     n_rows = (n_models + n_cols - 1) // n_cols
 
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 5 * n_rows))
-    axes = axes.flatten() if n_models > 1 else [axes]
+    axes = np.atleast_1d(axes).flatten()
 
     for idx, (name, model) in enumerate(models.items()):
         y_pred = model.predict(X)
@@ -144,7 +146,7 @@ def plot_feature_importance(
     ax = axes[0]
     ax.barh(mean_importance_df['Feature'], mean_importance_df['Mean Importance'])
     ax.set_xlabel('Mean Importance Score')
-    ax.set_title('Feature Importance (Averaged Across All Models)')
+    ax.set_title('Feature Importance')
     ax.invert_yaxis()
 
     # Add error bars
@@ -180,7 +182,7 @@ def plot_feature_importance(
         ax=ax,
         cbar_kws={'label': 'Importance Score'}
     )
-    ax.set_title('Feature Importance by Model')
+    ax.set_title('Feature Importance')
     ax.set_xlabel('Model')
     ax.set_ylabel('Feature')
 

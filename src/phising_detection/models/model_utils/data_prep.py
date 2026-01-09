@@ -13,7 +13,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-from ...utils import hopsworks_utils
+from phising_detection.utils import hopsworks_utils
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +110,8 @@ def split_data(
     y: pd.Series,
     val_size: float = 0.15,
     test_size: float = 0.15,
-    random_state: int = 42
+    random_state: int = 42,
+    balanced_test: bool = False
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, pd.Series]:
     """
     Split data into train, validation, and test sets.
@@ -121,10 +122,14 @@ def split_data(
         val_size: Fraction for validation
         test_size: Fraction for testing
         random_state: Random seed
+        balanced_test: If True, create a 50/50 balanced test set
 
     Returns:
         Tuple of (X_train, X_val, X_test, y_train, y_val, y_test)
     """
+    if balanced_test:
+        return split_data_balanced_test(X, y, val_size, test_size, random_state)
+
     # First split: separate test set
     train_size = 1.0 - test_size
     logger.info(f"Splitting data: {train_size:.0%} train+val, {test_size:.0%} test")
@@ -151,6 +156,108 @@ def split_data(
     logger.info(f"  Train: {y_train.value_counts().to_dict()}")
     logger.info(f"  Val:   {y_val.value_counts().to_dict()}")
     logger.info(f"  Test:  {y_test.value_counts().to_dict()}")
+
+    return X_train, X_val, X_test, y_train, y_val, y_test
+
+
+def split_data_balanced_test(
+    X: pd.DataFrame,
+    y: pd.Series,
+    val_size: float = 0.15,
+    test_size: float = 0.15,
+    random_state: int = 42
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, pd.Series]:
+    """
+    Split data with a perfectly balanced (50/50) test set.
+
+    This function ensures the test set has equal numbers of phishing and non-phishing
+    samples, which is useful for unbiased evaluation metrics.
+
+    Args:
+        X: Features
+        y: Target
+        val_size: Fraction for validation (of remaining data after test split)
+        test_size: Fraction for testing (approximate, will be adjusted for balance)
+        random_state: Random seed
+
+    Returns:
+        Tuple of (X_train, X_val, X_test, y_train, y_val, y_test)
+    """
+    logger.info("Creating BALANCED test set (50% phishing, 50% legitimate)...")
+
+    # Separate by class
+    phishing_mask = y == 1
+    legitimate_mask = y == 0
+
+    X_phishing = X[phishing_mask]
+    y_phishing = y[phishing_mask]
+    X_legitimate = X[legitimate_mask]
+    y_legitimate = y[legitimate_mask]
+
+    # Calculate test set size (equal samples from each class)
+    total_samples = len(X)
+    desired_test_samples = int(total_samples * test_size)
+    test_samples_per_class = desired_test_samples // 2  # Split evenly
+
+    # Ensure we don't exceed available samples
+    max_test_per_class = min(len(X_phishing), len(X_legitimate), test_samples_per_class)
+
+    logger.info(f"Test set size: {max_test_per_class * 2} samples ({max_test_per_class} phishing + {max_test_per_class} legitimate)")
+
+    # Split phishing samples into train_val and test
+    X_phishing_trainval, X_phishing_test, y_phishing_trainval, y_phishing_test = train_test_split(
+        X_phishing, y_phishing,
+        test_size=max_test_per_class,
+        random_state=random_state
+    )
+
+    # Split legitimate samples into train_val and test
+    X_legitimate_trainval, X_legitimate_test, y_legitimate_trainval, y_legitimate_test = train_test_split(
+        X_legitimate, y_legitimate,
+        test_size=max_test_per_class,
+        random_state=random_state
+    )
+
+    # Combine test sets (now balanced 50/50)
+    X_test = pd.concat([X_phishing_test, X_legitimate_test])
+    y_test = pd.concat([y_phishing_test, y_legitimate_test])
+
+    # Shuffle test set
+    shuffle_idx = X_test.sample(frac=1, random_state=random_state).index
+    X_test = X_test.loc[shuffle_idx]
+    y_test = y_test.loc[shuffle_idx]
+
+    # Combine remaining data for train/val split
+    X_trainval = pd.concat([X_phishing_trainval, X_legitimate_trainval])
+    y_trainval = pd.concat([y_phishing_trainval, y_legitimate_trainval])
+
+    # Split train_val into train and validation (stratified)
+    X_train, X_val, y_train, y_val = train_test_split(
+        X_trainval, y_trainval,
+        test_size=val_size,
+        random_state=random_state,
+        stratify=y_trainval
+    )
+
+    # Log split sizes
+    total = len(X)
+    logger.info(f"\nFinal split sizes:")
+    logger.info(f"  Train: {len(X_train)} samples ({len(X_train)/total*100:.1f}%)")
+    logger.info(f"  Val:   {len(X_val)} samples ({len(X_val)/total*100:.1f}%)")
+    logger.info(f"  Test:  {len(X_test)} samples ({len(X_test)/total*100:.1f}%) - BALANCED")
+
+    # Log class distributions
+    logger.info(f"\nClass distribution:")
+    logger.info(f"  Train: {y_train.value_counts().to_dict()}")
+    logger.info(f"  Val:   {y_val.value_counts().to_dict()}")
+    logger.info(f"  Test:  {y_test.value_counts().to_dict()} (50/50 split)")
+
+    # Verify test set is balanced
+    test_balance = y_test.value_counts()
+    if len(test_balance) == 2 and test_balance.iloc[0] == test_balance.iloc[1]:
+        logger.info("✓ Test set is perfectly balanced!")
+    else:
+        logger.warning("⚠ Test set balance may be slightly off")
 
     return X_train, X_val, X_test, y_train, y_val, y_test
 
