@@ -1,9 +1,0 @@
-title: Phishing Detection Model
-description: Machine learning model performance and metrics for phishing URL detection
-theme: jekyll-theme-minimal
-show_downloads: false
-
-# GitHub repository info (update if needed)
-github:
-  repository_url: https://github.com/yourusername/ID2223-project
-  is_project_page: true
