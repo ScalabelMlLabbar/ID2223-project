@@ -23,8 +23,3 @@ dev = [
     "responses>=0.25.8",
 ]
 
-[tool.uv.workspace]
-members = [
-    "HF_app",
-]
-
