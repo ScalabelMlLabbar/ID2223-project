@@ -16,9 +16,9 @@ import argparse
 from typing import List, Dict, Any
 import pandas as pd
 
-from phising_detection.features.urlscan_features import extract_features_to_dataframe
-from phising_detection.utils.urlscan import URLScanClient, URLScanError
-import phising_detection.utils.hopsworks_utils as hw
+from .urlscan_features import extract_features_to_dataframe
+from ..utils.urlscan import URLScanClient, URLScanError
+from ..utils import hopsworks_utils as hw
 
 # Add src folder to path
 
