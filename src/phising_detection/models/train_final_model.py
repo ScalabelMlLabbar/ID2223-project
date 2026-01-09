@@ -15,8 +15,10 @@ import argparse
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-from .model_utils import data_prep, model_configs, evaluation
-from ..utils import hopsworks_utils as hw
+from model_utils.evaluation import analyze_feature_importance
+from model_utils.visualization import plot_confusion_matrices, plot_feature_importance
+from model_utils import data_prep, model_configs, evaluation
+from phising_detection.utils import hopsworks_utils as hw
 
 # Configure logging
 logging.basicConfig(
@@ -34,7 +36,8 @@ def train_and_upload_model(
     test_size: float = 0.15,
     cv_folds: int = 10,
     n_iter: int = 100,
-    registry_model_name: str = "phishing_detector"
+    registry_model_name: str = "phishing_detector",
+    balanced_test: bool = True
 ):
     """
     Train best model with extensive hyperparameter search and upload to Hopsworks.
@@ -48,6 +51,7 @@ def train_and_upload_model(
         cv_folds: Number of CV folds for hyperparameter search
         n_iter: Number of iterations for RandomizedSearchCV
         registry_model_name: Name for model in Hopsworks registry
+        balanced_test: If True, create a 50/50 balanced test set (default: True)
     """
     logger.info("=" * 80)
     logger.info("FINAL MODEL TRAINING PIPELINE")
@@ -55,6 +59,7 @@ def train_and_upload_model(
     logger.info(f"Model: {model_name}")
     logger.info(f"CV Folds: {cv_folds}")
     logger.info(f"RandomizedSearchCV iterations: {n_iter}")
+    logger.info(f"Balanced test set: {balanced_test}")
 
     # 1. Connect to Hopsworks and load data
     logger.info("\n1. Loading data from Hopsworks...")
@@ -65,7 +70,7 @@ def train_and_upload_model(
     logger.info("\n2. Preparing data...")
     X, y = data_prep.prepare_features(raw_data)
     X_train_raw, X_val_raw, X_test_raw, y_train, y_val, y_test = data_prep.split_data(
-        X, y, val_size=val_size, test_size=test_size
+        X, y, val_size=val_size, test_size=test_size, balanced_test=balanced_test
     )
 
     # Initial normalization for hyperparameter search
@@ -156,6 +161,9 @@ def train_and_upload_model(
     """
 
     # 9. Save model and scaler to Hopsworks Model Registry
+    output_dir = ["confusion_matrices.png", "feature_importance.png"]
+    create_visualisations_of_model_performance(final_model, X_test_final, y_test, output_dir)
+
     logger.info("\n9. Uploading model, scaler, and artifacts to Hopsworks Model Registry...")
 
     hw.save_model_to_registry(
@@ -165,7 +173,8 @@ def train_and_upload_model(
         metrics=all_metrics,
         description=description,
         scaler=final_scaler,
-        feature_names=list(X_train_val.columns)
+        feature_names=list(X_train_val.columns),
+        eveal_imgs =output_dir
     )
 
     # 10. Summary
@@ -185,6 +194,19 @@ def train_and_upload_model(
     logger.info("=" * 80)
 
     return final_model, final_scaler, test_metrics, search_results
+
+
+def create_visualisations_of_model_performance(model, X_test, y_test, output_path: list ):
+    """Create visualizations of model performance."""
+    # This function can be implemented to generate and save plots
+    # such as confusion matrices, ROC curves, etc.
+    models = {"final_model": model}
+    plot_confusion_matrices(models, X_test, y_test, output_path[0])
+    feture_importance, mean_importance = analyze_feature_importance(models, list(X_test.columns))
+    plot_feature_importance(feture_importance, mean_importance, output_path[1])
+
+
+
 
 
 def parse_args():
@@ -230,6 +252,18 @@ def parse_args():
         default=1,
         help="Feature group version (default: 1)"
     )
+    parser.add_argument(
+        "--balanced-test",
+        action="store_true",
+        default=True,
+        help="Create a 50/50 balanced test set (default: True)"
+    )
+    parser.add_argument(
+        "--no-balanced-test",
+        action="store_false",
+        dest="balanced_test",
+        help="Use stratified test set instead of balanced"
+    )
 
     return parser.parse_args()
 
@@ -243,7 +277,8 @@ if __name__ == "__main__":
         feature_group_version=args.feature_group_version,
         cv_folds=args.cv_folds,
         n_iter=args.n_iter,
-        registry_model_name=args.registry_name
+        registry_model_name=args.registry_name,
+        balanced_test=args.balanced_test
     )
 
     print(f"\n✓ Model successfully trained and uploaded!")
