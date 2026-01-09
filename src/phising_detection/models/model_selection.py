@@ -9,8 +9,8 @@ from typing import Tuple, Any
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-from src.phising_detection.models import data_prep, model_configs, evaluation
-from src.phising_detection.utils.hopsworks_utils import connect_to_hopsworks
+from .model_utils import data_prep, model_configs, evaluation
+from ..utils.hopsworks_utils import connect_to_hopsworks
 
 logger = logging.getLogger(__name__)
 
