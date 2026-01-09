@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch, MagicMock
 import pandas as pd
 import numpy as np
 
-from phising_detection.inference.pipeline import PhishingDetectionPipeline
+from src.phising_detection.inference.pipeline import PhishingDetectionPipeline
 
 
 class TestPhishingDetectionPipeline:
