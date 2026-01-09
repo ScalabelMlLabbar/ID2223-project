@@ -228,7 +228,8 @@ def save_model_to_registry(
     description: str = "",
     model_schema: dict = None,
     scaler=None,
-    feature_names: list = None
+    feature_names: list = None,
+    eveal_imgs: list = None
 ):
     """
     Save a trained model to Hopsworks Model Registry with all artifacts.
@@ -242,6 +243,7 @@ def save_model_to_registry(
         model_schema: Optional model schema
         scaler: Optional scaler object to save with model
         feature_names: Optional list of feature names
+        eveal_imgs: Optional list of evaluation image file paths to save
 
     Returns:
         Model registry object
@@ -283,6 +285,17 @@ def save_model_to_registry(
             with open(params_path, 'w') as f:
                 f.write(description)
             logger.info(f"Hyperparameters saved to temporary path: {params_path}")
+
+        if eveal_imgs is not None:
+            for idx, img_path in enumerate(eveal_imgs):
+                if os.path.isfile(img_path):
+                    dest_path = os.path.join(tmpdir, f"evaluation_image_{idx + 1}{os.path.splitext(img_path)[1]}")
+                    with open(img_path, 'rb') as src_file:
+                        with open(dest_path, 'wb') as dest_file:
+                            dest_file.write(src_file.read())
+                    logger.info(f"Evaluation image saved to temporary path: {dest_path}")
+                else:
+                    logger.warning(f"Evaluation image path does not exist: {img_path}")
 
         # Create model in registry
         try:
