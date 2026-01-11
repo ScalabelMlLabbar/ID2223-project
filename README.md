@@ -33,7 +33,11 @@ These are the features that are extracted from the data and used to train the mo
 - subdomain_count: How many subdomains there are to the domain
 
 ## Model Selection
-The choosen model was a neural network, more specifically an MLP. [Info about the MLP and why we choose it]. 
+The chosen model was a neural network, more specifically an MLP (Multi-Layer Perceptron). The model selection process involved:
+1. **Initial Comparison**: Trained multiple candidate models (Random Forest, Gradient Boosting, Logistic Regression, MLP, SVM, Naive Bayes, KNN) and compared their performance on a validation set
+2. **Hyperparameter Tuning**: Selected the top 3 performing models and tuned their hyperparameters using grid search with 5-fold cross-validation
+3. **Final Selection**: Compared the tuned models and selected the MLP as it achieved the best accuracy while also not overfitting, achieving general good generalization.
+4. **Final Training**: Retrained the MLP on the combined train+validation set with extensive hyperparameter search (100 iterations) to produce the final model with 94.2% test accuracy 
 
 ## Repository Structure
 ```
@@ -76,6 +80,24 @@ The choosen model was a neural network, more specifically an MLP. [Info about th
 │           └── urlscan.py
 ```
 ## ML Pipeline Structure
+
+### 1. Feature Pipeline
+- **Data Collection**: Fetches phishing URLs from the Phishing Database and secure URLs from Tranco list domains
+- **URL Scanning**: Uses URLScan.io API to analyze URLs and extract security features
+- **Feature Engineering**: Extracts 8 key features (domain age, TLS status, URL length, subdomain count, etc.)
+- **Storage**: Processed features are stored in Hopsworks feature store for training and inference
+
+### 2. Training Pipeline
+- **Data Preparation**: Retrieves balanced datasets from Hopsworks feature store
+- **Model Selection**: Compares multiple models (Random Forest, Gradient Boosting, Logistic Regression, MLP)
+- **Hyperparameter Tuning**: Performs randomized search with cross-validation to optimize model performance
+- **Model Registry**: Best performing model (MLP) is saved to Hopsworks model registry
+
+### 3. Inference Pipeline
+- **User Input**: Accepts URL from user via HuggingFace Space UI
+- **Feature Extraction**: Extracts same features from input URL using URLScan.io
+- **Prediction**: Loads trained model from Hopsworks and predicts phishing probability
+- **Result Display**: Shows prediction with confidence score to user
 
 
 
