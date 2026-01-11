@@ -247,6 +247,16 @@ def get_extensive_param_grids() -> Dict[str, Dict[str, list]]:
             'solver': ['lbfgs', 'liblinear', 'saga'],
             'penalty': ['l2'],
             'max_iter': [1000, 2000]
+        },
+        'Neural Network (MLP)': {
+            'hidden_layer_sizes': [(64,), (128,), (64, 32), (128, 64), (128, 64, 32), (256, 128, 64)],
+            'activation': ['relu', 'tanh'],
+            'solver': ['adam', 'sgd'],
+            'alpha': [0.0001, 0.001, 0.01, 0.1],
+            'learning_rate': ['constant', 'adaptive'],
+            'max_iter': [500, 1000, 1500],
+            'early_stopping': [True],
+            'validation_fraction': [0.1, 0.2]
         }
     }
     return param_grids

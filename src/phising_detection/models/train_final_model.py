@@ -206,8 +206,13 @@ def create_visualisations_of_model_performance(model, X_test, y_test, output_pat
     # such as confusion matrices, ROC curves, etc.
     models = {"final_model": model}
     plot_confusion_matrices(models, X_test, y_test, output_path[0])
+
+    # Only plot feature importance if the model supports it
     feture_importance, mean_importance = analyze_feature_importance(models, list(X_test.columns))
-    plot_feature_importance(feture_importance, mean_importance, output_path[1])
+    if not mean_importance.empty:
+        plot_feature_importance(feture_importance, mean_importance, output_path[1])
+    else:
+        logger.info("Skipping feature importance plot - model does not support feature importance")
 
 
 
@@ -222,15 +227,15 @@ def parse_args():
     parser.add_argument(
         "--model",
         type=str,
-        default="Random Forest",
-        choices=["Random Forest", "Gradient Boosting", "Logistic Regression"],
+        default="Neural Network (MLP)",
+        choices=["Random Forest", "Gradient Boosting", "Logistic Regression", "Neural Network (MLP)"],
         help="Model to train (default: Random Forest)"
     )
     parser.add_argument(
         "--cv-folds",
         type=int,
-        default=10,
-        help="Number of cross-validation folds (default: 10)"
+        default=5,
+        help="Number of cross-validation folds (default: 5)"
     )
     parser.add_argument(
         "--n-iter",
