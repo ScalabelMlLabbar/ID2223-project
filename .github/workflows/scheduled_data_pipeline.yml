@@ -91,7 +91,7 @@ jobs:
             --fg1-name phishing_urls \
             --fg1-version 2 \
             --fg2-name legit_urls_before_scan \
-            --fg2-version 1 \
+            --fg2-version 2 \
             --output-fg-name urlscan_features \
             --output-version 1 \
             --batch-size 500 \

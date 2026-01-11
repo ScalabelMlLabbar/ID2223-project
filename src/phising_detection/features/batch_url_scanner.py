@@ -36,10 +36,12 @@ def load_and_balance_feature_groups(
     fg1_version: int,
     fg2_name: str,
     fg2_version: int,
-    sample_size: int = None
+    sample_size: int = None,
+    scanned_urls: set = None
 ) -> pd.DataFrame:
     """
     Load two feature groups and create balanced dataset with equal samples.
+    IMPORTANT: Filters out already scanned URLs BEFORE sampling.
 
     Args:
         project: Hopsworks project object
@@ -48,6 +50,7 @@ def load_and_balance_feature_groups(
         fg2_name: Name of second feature group (e.g., legitimate URLs)
         fg2_version: Version of second feature group
         sample_size: Number of samples from each group (if None, uses minimum)
+        scanned_urls: Set of already scanned URLs to filter out BEFORE sampling
 
     Returns:
         Balanced DataFrame with equal samples from both groups
@@ -58,8 +61,38 @@ def load_and_balance_feature_groups(
     logger.info(f"Loading feature group: {fg2_name} v{fg2_version}")
     df2 = hw.read_feature_group(project, fg2_name, fg2_version)
 
-    logger.info(f"Feature group 1 size: {len(df1)}")
-    logger.info(f"Feature group 2 size: {len(df2)}")
+    logger.info(f"Feature group 1 size (before filtering): {len(df1)}")
+    logger.info(f"Feature group 2 size (before filtering): {len(df2)}")
+
+    # Filter out already scanned URLs BEFORE sampling
+    if scanned_urls:
+        logger.info("Filtering out already scanned URLs from feature groups...")
+
+        # Detect URL column name for each dataframe
+        url_col_1 = 'phishing_url' if 'phishing_url' in df1.columns else 'url'
+        url_col_2 = 'phishing_url' if 'phishing_url' in df2.columns else 'url'
+
+        original_len_1 = len(df1)
+        original_len_2 = len(df2)
+
+        df1 = df1[~df1[url_col_1].isin(scanned_urls)].reset_index(drop=True)
+        df2 = df2[~df2[url_col_2].isin(scanned_urls)].reset_index(drop=True)
+
+        filtered_1 = original_len_1 - len(df1)
+        filtered_2 = original_len_2 - len(df2)
+
+        logger.info(f"Filtered {filtered_1} already scanned URLs from {fg1_name}")
+        logger.info(f"Filtered {filtered_2} already scanned URLs from {fg2_name}")
+        logger.info(f"Feature group 1 size (after filtering): {len(df1)}")
+        logger.info(f"Feature group 2 size (after filtering): {len(df2)}")
+
+    # Check if we have any URLs left
+    if len(df1) == 0 or len(df2) == 0:
+        logger.warning("One or both feature groups are empty after filtering!")
+        if len(df1) == 0 and len(df2) == 0:
+            logger.error("No URLs left to scan in either feature group")
+            return pd.DataFrame()
+        # Continue with whatever we have
 
     # Determine sample size
     if sample_size is None:
@@ -70,8 +103,8 @@ def load_and_balance_feature_groups(
     logger.info(f"Sampling {sample_size} records from each feature group")
 
     # Sample equal amounts from each, important this randomness can affect performens of network, upsameling would be better if we had the resources.
-    df1_sample = df1.sample(n=sample_size + int(0.33*sample_size), random_state=42) #to acount for offline pages in phising dataset
-    df2_sample = df2.sample(n=sample_size, random_state=42)
+    df1_sample = df1.sample(n=min(sample_size, len(df1)), random_state=42) #to acount for offline pages in phising dataset
+    df2_sample = df2.sample(n=min(sample_size, len(df2)), random_state=42)
 
     # Combine and shuffle
     balanced_df = pd.concat([df1_sample, df2_sample], ignore_index=True)
@@ -469,18 +502,7 @@ def main(
     logger.info("Initializing URLScan client...")
     urlscan_client = URLScanClient()
 
-    # Load and balance feature groups
-    logger.info("Loading and balancing feature groups...")
-    balanced_df = load_and_balance_feature_groups(
-        project=project,
-        fg1_name=fg1_name,
-        fg1_version=fg1_version,
-        fg2_name=fg2_name,
-        fg2_version=fg2_version,
-        sample_size=sample_size
-    )
-
-    # Check for already scanned URLs (including failed attempts)
+    # Check for already scanned URLs (including failed attempts) FIRST
     logger.info("Checking for already scanned URLs...")
     scanned_urls = get_already_scanned_urls(
         project=project,
@@ -490,10 +512,16 @@ def main(
         attempted_fg_version=1
     )
 
-    # Filter out already scanned URLs
-    balanced_df = filter_already_scanned(
-        df=balanced_df,
-        scanned_urls=scanned_urls
+    # Load and balance feature groups (filtering happens BEFORE sampling)
+    logger.info("Loading and balancing feature groups...")
+    balanced_df = load_and_balance_feature_groups(
+        project=project,
+        fg1_name=fg1_name,
+        fg1_version=fg1_version,
+        fg2_name=fg2_name,
+        fg2_version=fg2_version,
+        sample_size=sample_size,
+        scanned_urls=scanned_urls  # Pass scanned URLs to filter before sampling
     )
 
     # Check if there are any URLs left to scan
@@ -637,13 +665,13 @@ def parse_args():
     parser.add_argument(
         "--fg2-name",
         type=str,
-        default="legitimate_urls",
+        default="legit_urls_before_scan",
         help="Name of second feature group (default: legitimate_urls)"
     )
     parser.add_argument(
         "--fg2-version",
         type=int,
-        default=1,
+        default=2,
         help="Version of second feature group (default: 1)"
     )
     parser.add_argument(
