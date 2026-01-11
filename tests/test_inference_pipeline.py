@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch, MagicMock
 import pandas as pd
 import numpy as np
 
-from src.phising_detection.inference.pipeline import PhishingDetectionPipeline
+from phising_detection.inference.pipeline import PhishingDetectionPipeline
 
 
 class TestPhishingDetectionPipeline:
@@ -28,7 +28,7 @@ class TestPhishingDetectionPipeline:
 
     def test_init_with_urlscan(self):
         """Test initialization with URLScan API key."""
-        with patch('src.phising_detection.inference.pipeline.URLScanClient') as mock_client:
+        with patch('phising_detection.inference.pipeline.URLScanClient') as mock_client:
             pipeline = PhishingDetectionPipeline(
                 model_name="test_model",
                 urlscan_api_key="test_key"
@@ -49,8 +49,8 @@ class TestPhishingDetectionPipeline:
         pipeline.feature_names = ['feature1', 'feature2']
         assert pipeline.is_loaded() is True
 
-    @patch('src.phising_detection.inference.pipeline.connect_to_hopsworks')
-    @patch('src.phising_detection.inference.pipeline.joblib.load')
+    @patch('phising_detection.inference.pipeline.connect_to_hopsworks')
+    @patch('phising_detection.inference.pipeline.joblib.load')
     def test_load_model_from_hopsworks(self, mock_joblib_load, mock_connect):
         """Test loading model from Hopsworks."""
         # Setup mocks
@@ -89,8 +89,8 @@ class TestPhishingDetectionPipeline:
             mock_connect.assert_called_once()
             mock_mr.get_model.assert_called_once_with("test_model")
 
-    @patch('src.phising_detection.inference.pipeline.connect_to_hopsworks')
-    @patch('src.phising_detection.inference.pipeline.joblib.load')
+    @patch('phising_detection.inference.pipeline.connect_to_hopsworks')
+    @patch('phising_detection.inference.pipeline.joblib.load')
     def test_load_model_with_version(self, mock_joblib_load, mock_connect):
         """Test loading specific model version from Hopsworks."""
         # Setup mocks
@@ -304,7 +304,7 @@ class TestPhishingDetectionPipeline:
             pipeline.predict_url("https://example.com")
         assert "URLScan client not initialized" in str(exc_info.value)
 
-    @patch('src.phising_detection.inference.pipeline.extract_features')
+    @patch('phising_detection.inference.pipeline.extract_features')
     def test_predict_url_success(self, mock_extract_features):
         """Test successful end-to-end URL prediction."""
         # Setup pipeline
@@ -379,7 +379,7 @@ class TestPhishingDetectionPipeline:
         assert result['prediction'] == "ERROR"
         assert result['confidence'] == 0.0
 
-    @patch('src.phising_detection.inference.pipeline.extract_features')
+    @patch('phising_detection.inference.pipeline.extract_features')
     def test_predict_url_exception_handling(self, mock_extract_features):
         """Test predict_url handles exceptions gracefully."""
         # Setup pipeline

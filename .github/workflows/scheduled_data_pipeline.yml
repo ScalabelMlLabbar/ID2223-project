@@ -13,19 +13,19 @@ on:
         required: true
         type: choice
         options:
-          - load_phishing_urls
+          - feature_pipeline_part1
           - batch_scanner
           - both
 
 jobs:
-  load-phishing-urls:
-    name: Load Phishing URLs
+  feature-pipeline-part1:
+    name: Feature Pipeline part 1
     runs-on: ubuntu-latest
     # Only run on midnight schedule or manual trigger
     if: |
-      github.event.schedule == '0 0 * * *' ||
-      github.event_name == 'workflow_dispatch' &&
-      (github.event.inputs.job_to_run == 'load_phishing_urls' || github.event.inputs.job_to_run == 'both')
+      (github.event.schedule == '0 0 * * *') ||
+      (github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.job_to_run == 'feature_pipeline_part1' || github.event.inputs.job_to_run == 'both'))
 
     steps:
       - name: Checkout code
@@ -46,21 +46,21 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
-      - name: Load phishing URLs to Hopsworks
+      - name: Execute Feature Pipeline part 1
         env:
           HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
           HOPSWORKS_PROJECT_NAME: ${{ secrets.HOPSWORKS_PROJECT_NAME }}
         run: |
-          uv run python src/phising_detection/data/load_phishing_urls.py
+          uv run python src/phising_detection/features/feature_pipeline.py
 
   batch-url-scanner:
     name: Batch URL Scanner
     runs-on: ubuntu-latest
     # Run on 2-hour schedule or manual trigger
     if: |
-      github.event.schedule == '0 */2 * * *' ||
-      github.event_name == 'workflow_dispatch' &&
-      (github.event.inputs.job_to_run == 'batch_scanner' || github.event.inputs.job_to_run == 'both')
+      (github.event.schedule == '0 */2 * * *') ||
+      (github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.job_to_run == 'batch_scanner' || github.event.inputs.job_to_run == 'both'))
 
     steps:
       - name: Checkout code

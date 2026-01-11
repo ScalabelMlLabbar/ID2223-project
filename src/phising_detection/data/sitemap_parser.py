@@ -107,7 +107,8 @@ def _parse_sitemap(
     max_urls: Optional[int] = None,
     timeout: int = 10,
     max_depth: int = 2,
-    current_depth: int = 0
+    current_depth: int = 0,
+    max_sitemaps_per_index: int = 5
 ) -> Set[str]:
     """
     Parse sitemap XML content and extract URLs.
@@ -142,10 +143,16 @@ def _parse_sitemap(
         if sitemap_refs and current_depth < max_depth:
             # This is a sitemap index - fetch referenced sitemaps
             logger.info(f"Found sitemap index with {len(sitemap_refs)} sitemaps")
+            
+            if len(sitemap_refs) > max_sitemaps_per_index:
+                logger.info(f"Limiting sitemaps to {max_sitemaps_per_index} sitemaps of {len(sitemap_refs)} possible")
 
-            for sitemap_loc in sitemap_refs:
-                if max_urls and len(urls) >= max_urls:
+            for index, sitemap_loc in enumerate(sitemap_refs):
+                if index >= max_sitemaps_per_index:
                     break
+
+                if max_urls and len(urls) >= max_urls:
+                    return urls
 
                 sitemap_url = sitemap_loc.text
                 if sitemap_url:
@@ -153,13 +160,15 @@ def _parse_sitemap(
                         response = requests.get(sitemap_url, timeout=timeout, headers={
                             'User-Agent': 'Mozilla/5.0 (compatible; URLCollector/1.0)'
                         })
+                        # For nested sitemaps
                         if response.status_code == 200:
                             nested_urls = _parse_sitemap(
                                 response.content,
                                 max_urls - len(urls) if max_urls else None,
                                 timeout,
                                 max_depth,
-                                current_depth + 1
+                                current_depth + 1,
+                                max_sitemaps_per_index
                             )
                             urls.update(nested_urls)
                             time.sleep(0.1)  # Small delay to be polite
