@@ -1,7 +1,7 @@
 
 # ID2223-project
 ## Project Description
-The purpose of this project is to predict whether a URL is a phishing URL or a secure URL based on different URL features. We use two different data sources, one for phishing URLs and one for secure URLs. The confirmed active phishing URLs are sourced from a phishing database on github [ref phish database]. The secure URLs are sourced from parsing domain sitemaps for URLs from the tranco list top 1 million domains [ref tranco]. In this project we make the assumption that the URLs we find in the sitemaps are secure and that URLs in the phishing database are malicious without additional checking. All of the processed data is stored in our feature store in Hopsworks, we also have our model in the model registry in Hopsworks. The chosen model to use was a MLP, and the UI for user inference was built with a HuggingFace Space.
+The purpose of this project is to predict whether a URL is a phishing URL or a secure URL based on different URL features. We use two different data sources, one for phishing URLs and one for secure URLs. The confirmed active phishing URLs are sourced from a phishing database on github. The secure URLs are sourced from parsing domain sitemaps for URLs from the Tranco list top 1 million domains. In this project we make the assumption that the URLs we find in the sitemaps are secure and that URLs in the phishing database are malicious, without additional checking. All of the processed data is stored in our feature store in Hopsworks, we also have our model in the model registry in Hopsworks. The chosen model was a MLP, and the UI for user inference was built with a HuggingFace Space.
 - Here is the link to the HuggingFace space: https://huggingface.co/spaces/BimonML/Project_phising_detection
 
 Here is the test performance of the MLP model. This can also be found on the HuggingFace space: 
@@ -19,18 +19,18 @@ The Phishing databse: https://github.com/Phishing-Database/
 - A regularly updated repository that helps identify phishing threats. This is the specific folder with the updated .txt files that we use in the project: https://github.com/Phishing-Database/Phishing.Database/tree/master/phishing-links-ACTIVE. Currently, in the beginning of January 2026, there are more that 750 000 active links. 
 
 The Tranco list: https://tranco-list.eu/
-- A list current top 1 million domains on the internet. It is updated every day and is calculated by averaging different popularity ranks over a period of 30 days. 
+- A list of current top 1 million domains on the internet. It is updated every day and is calculated by averaging different popularity ranks over a period of 30 days. 
 
 ## Feature Extraction
 These are the features that are extracted from the data and used to train the model.
-- domain_age_days: How many days a domain has been registered.
-- secure_percentage: ???
-- has_umbrella_rank: 0 for no umbrella rank, 1 for having umbrella rank
-- umbrella_rank: Ranking of most queried domains based on global passive DNS usage by Cisco Umbrella
-- has_tls: 0 for no TLS, 1 for having TLS
-- tls_valid_days: The number of days a TLS/SSL certificate is considered valid
-- url_length: The length of the url
-- subdomain_count: How many subdomains there are to the domain
+- _domain_age_days_: How many days a domain has been registered.
+- _secure_percentage_: Percentage of HTTPS requests
+- _has_umbrella_rank_: A check if there exists a umbrella rank
+- _umbrella_rank_: Ranking of most queried domains based on global passive DNS usage by Cisco Umbrella
+- _has_tls_: A check if there exists TLS
+- _tls_valid_days_: The number of days a TLS/SSL certificate is considered valid
+- _url_length_: The length of the url
+- _subdomain_count_: How many subdomains there are to the domain
 
 ## Model Selection
 The chosen model was a neural network, more specifically an MLP (Multi-Layer Perceptron). The model selection process involved:
@@ -51,33 +51,33 @@ The chosen model was a neural network, more specifically an MLP (Multi-Layer Per
 │   └── phishing_detection/
 │       ├── data/                         # Data ingestion and preprocessing
 │       │   ├── extract_urls.py           # Script to extract urls from domains
-│       │   ├── load_legit_domains.py     # Script to get the tranco domains
+│       │   ├── load_legit_domains.py     # Script to get the Tranco domains
 │       │   ├── load_phishing_urls.py     # Script to get the phishing urls from the database
 │       │   ├── seperate_domain_urls.py   # Script to seperate domains from urls
 │       │   └── sitemap_parser.py         # Functions to collect domain sitemaps
 │       │
 │       ├── features/                     # Feature engineering
-│       │   ├── batch_url_scanner.py
+│       │   ├── batch_url_scanner.py      # Scan the collect urls and extracts features in batches
 │       │   ├── feature_pipeline.py       # calling all scripts from src/data
 │       │   └── urlscan_features.py
 │       │
 │       ├── inference/                    # Inference pipeline
 │       │   └── pipeline.py
 │       │
-│       ├── models/                       # Model training and evaluation
+│       ├── models/                       # Model configs, model-dependent transformations, training and evaluation
 │       │   ├── model_utils/
-│       │   │   ├── data_prep.py
-│       │   │   ├── evaluation.py
+│       │   │   ├── data_prep.py          
+│       │   │   ├── evaluation.py          
 │       │   │   ├── model_configs.py
 │       │   │   ├── train_pipeline.py
 │       │   │   └── visualization.py
 │       │   │
 │       │   ├── model_selection.py        # Compares models and returns the best one
-│       │   └── train_final_model.py      # 
+│       │   └── train_final_model.py      
 │       │
 │       └── utils/                        # Shared utilities
-│           ├── hopsworks_utils.py        # functions to simpliy interaction with Hopsworks
-│           └── urlscan.py
+│           ├── hopsworks_utils.py        # functions to simplify interactions with Hopsworks
+│           └── urlscan.py                # functions to simplify interactions with URLScan.io
 ```
 ## ML Pipeline Structure
 
