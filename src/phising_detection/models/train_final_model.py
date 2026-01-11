@@ -37,7 +37,8 @@ def train_and_upload_model(
     cv_folds: int = 10,
     n_iter: int = 100,
     registry_model_name: str = "phishing_detector",
-    balanced_test: bool = True
+    balanced_test: bool = True,
+    balanced_train_val: bool = True
 ):
     """
     Train best model with extensive hyperparameter search and upload to Hopsworks.
@@ -52,6 +53,7 @@ def train_and_upload_model(
         n_iter: Number of iterations for RandomizedSearchCV
         registry_model_name: Name for model in Hopsworks registry
         balanced_test: If True, create a 50/50 balanced test set (default: True)
+        balanced_train_val: If True, create balanced (50/50) train and val sets (default: True)
     """
     logger.info("=" * 80)
     logger.info("FINAL MODEL TRAINING PIPELINE")
@@ -60,6 +62,7 @@ def train_and_upload_model(
     logger.info(f"CV Folds: {cv_folds}")
     logger.info(f"RandomizedSearchCV iterations: {n_iter}")
     logger.info(f"Balanced test set: {balanced_test}")
+    logger.info(f"Balanced train/val sets: {balanced_train_val}")
 
     # 1. Connect to Hopsworks and load data
     logger.info("\n1. Loading data from Hopsworks...")
@@ -70,7 +73,8 @@ def train_and_upload_model(
     logger.info("\n2. Preparing data...")
     X, y = data_prep.prepare_features(raw_data)
     X_train_raw, X_val_raw, X_test_raw, y_train, y_val, y_test = data_prep.split_data(
-        X, y, val_size=val_size, test_size=test_size, balanced_test=balanced_test
+        X, y, val_size=val_size, test_size=test_size,
+        balanced_test=balanced_test, balanced_train_val=balanced_train_val
     )
 
     # Initial normalization for hyperparameter search
@@ -264,6 +268,18 @@ def parse_args():
         dest="balanced_test",
         help="Use stratified test set instead of balanced"
     )
+    parser.add_argument(
+        "--balanced-train-val",
+        action="store_true",
+        default=True,
+        help="Create balanced (50/50) train and validation sets (default: True)"
+    )
+    parser.add_argument(
+        "--no-balanced-train-val",
+        action="store_false",
+        dest="balanced_train_val",
+        help="Use stratified train/val sets instead of balanced"
+    )
 
     return parser.parse_args()
 
@@ -278,7 +294,8 @@ if __name__ == "__main__":
         cv_folds=args.cv_folds,
         n_iter=args.n_iter,
         registry_model_name=args.registry_name,
-        balanced_test=args.balanced_test
+        balanced_test=args.balanced_test,
+        balanced_train_val=args.balanced_train_val
     )
 
     print(f"\n✓ Model successfully trained and uploaded!")

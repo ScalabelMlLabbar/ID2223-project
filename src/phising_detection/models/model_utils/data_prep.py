@@ -111,7 +111,8 @@ def split_data(
     val_size: float = 0.15,
     test_size: float = 0.15,
     random_state: int = 42,
-    balanced_test: bool = False
+    balanced_test: bool = False,
+    balanced_train_val: bool = False
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, pd.Series]:
     """
     Split data into train, validation, and test sets.
@@ -123,11 +124,14 @@ def split_data(
         test_size: Fraction for testing
         random_state: Random seed
         balanced_test: If True, create a 50/50 balanced test set
+        balanced_train_val: If True, create 50/50 balanced train and validation sets
 
     Returns:
         Tuple of (X_train, X_val, X_test, y_train, y_val, y_test)
     """
-    if balanced_test:
+    if balanced_train_val:
+        return split_data_fully_balanced(X, y, val_size, test_size, random_state, balanced_test)
+    elif balanced_test:
         return split_data_balanced_test(X, y, val_size, test_size, random_state)
 
     # First split: separate test set
@@ -258,6 +262,135 @@ def split_data_balanced_test(
         logger.info("✓ Test set is perfectly balanced!")
     else:
         logger.warning("⚠ Test set balance may be slightly off")
+
+    return X_train, X_val, X_test, y_train, y_val, y_test
+
+
+def split_data_fully_balanced(
+    X: pd.DataFrame,
+    y: pd.Series,
+    val_size: float = 0.15,
+    test_size: float = 0.15,
+    random_state: int = 42,
+    balanced_test: bool = False
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, pd.Series]:
+    """
+    Split data with fully balanced (50/50) train, validation, and test sets.
+
+    This function ensures ALL splits have equal numbers of phishing and non-phishing
+    samples, which is useful for training on balanced data and preventing class imbalance issues.
+
+    Args:
+        X: Features
+        y: Target
+        val_size: Fraction for validation (approximate)
+        test_size: Fraction for testing (approximate)
+        random_state: Random seed
+        balanced_test: Ignored (always creates balanced splits)
+
+    Returns:
+        Tuple of (X_train, X_val, X_test, y_train, y_val, y_test)
+    """
+    logger.info("Creating FULLY BALANCED splits (50/50 for train, val, and test)...")
+
+    # Separate by class
+    phishing_mask = y == 1
+    legitimate_mask = y == 0
+
+    X_phishing = X[phishing_mask]
+    y_phishing = y[phishing_mask]
+    X_legitimate = X[legitimate_mask]
+    y_legitimate = y[legitimate_mask]
+
+    logger.info(f"Total phishing samples: {len(X_phishing)}")
+    logger.info(f"Total legitimate samples: {len(X_legitimate)}")
+
+    # Calculate split sizes based on the MINORITY class
+    min_class_size = min(len(X_phishing), len(X_legitimate))
+    total_balanced_samples = min_class_size * 2  # Equal from each class
+
+    # Calculate samples per split
+    test_samples_per_class = int(min_class_size * test_size)
+    val_samples_per_class = int(min_class_size * val_size)
+    train_samples_per_class = min_class_size - test_samples_per_class - val_samples_per_class
+
+    logger.info(f"\nBalanced split sizes (per class):")
+    logger.info(f"  Train: {train_samples_per_class} samples per class")
+    logger.info(f"  Val:   {val_samples_per_class} samples per class")
+    logger.info(f"  Test:  {test_samples_per_class} samples per class")
+
+    # Shuffle phishing samples
+    shuffle_idx_phishing = X_phishing.sample(frac=1, random_state=random_state).index
+    X_phishing_shuffled = X_phishing.loc[shuffle_idx_phishing].reset_index(drop=True)
+    y_phishing_shuffled = y_phishing.loc[shuffle_idx_phishing].reset_index(drop=True)
+
+    # Split phishing: first test_samples, then val_samples, then train_samples
+    X_phishing_test = X_phishing_shuffled.iloc[:test_samples_per_class].copy()
+    y_phishing_test = y_phishing_shuffled.iloc[:test_samples_per_class].copy()
+
+    X_phishing_val = X_phishing_shuffled.iloc[test_samples_per_class:test_samples_per_class + val_samples_per_class].copy()
+    y_phishing_val = y_phishing_shuffled.iloc[test_samples_per_class:test_samples_per_class + val_samples_per_class].copy()
+
+    X_phishing_train = X_phishing_shuffled.iloc[test_samples_per_class + val_samples_per_class:test_samples_per_class + val_samples_per_class + train_samples_per_class].copy()
+    y_phishing_train = y_phishing_shuffled.iloc[test_samples_per_class + val_samples_per_class:test_samples_per_class + val_samples_per_class + train_samples_per_class].copy()
+
+    # Shuffle legitimate samples
+    shuffle_idx_legitimate = X_legitimate.sample(frac=1, random_state=random_state).index
+    X_legitimate_shuffled = X_legitimate.loc[shuffle_idx_legitimate].reset_index(drop=True)
+    y_legitimate_shuffled = y_legitimate.loc[shuffle_idx_legitimate].reset_index(drop=True)
+
+    # Split legitimate: first test_samples, then val_samples, then train_samples
+    X_legitimate_test = X_legitimate_shuffled.iloc[:test_samples_per_class].copy()
+    y_legitimate_test = y_legitimate_shuffled.iloc[:test_samples_per_class].copy()
+
+    X_legitimate_val = X_legitimate_shuffled.iloc[test_samples_per_class:test_samples_per_class + val_samples_per_class].copy()
+    y_legitimate_val = y_legitimate_shuffled.iloc[test_samples_per_class:test_samples_per_class + val_samples_per_class].copy()
+
+    X_legitimate_train = X_legitimate_shuffled.iloc[test_samples_per_class + val_samples_per_class:test_samples_per_class + val_samples_per_class + train_samples_per_class].copy()
+    y_legitimate_train = y_legitimate_shuffled.iloc[test_samples_per_class + val_samples_per_class:test_samples_per_class + val_samples_per_class + train_samples_per_class].copy()
+
+    # Combine and shuffle each split
+    # Train set
+    X_train = pd.concat([X_phishing_train, X_legitimate_train])
+    y_train = pd.concat([y_phishing_train, y_legitimate_train])
+    shuffle_idx = X_train.sample(frac=1, random_state=random_state).index
+    X_train = X_train.loc[shuffle_idx]
+    y_train = y_train.loc[shuffle_idx]
+
+    # Validation set
+    X_val = pd.concat([X_phishing_val, X_legitimate_val])
+    y_val = pd.concat([y_phishing_val, y_legitimate_val])
+    shuffle_idx = X_val.sample(frac=1, random_state=random_state + 1).index
+    X_val = X_val.loc[shuffle_idx]
+    y_val = y_val.loc[shuffle_idx]
+
+    # Test set
+    X_test = pd.concat([X_phishing_test, X_legitimate_test])
+    y_test = pd.concat([y_phishing_test, y_legitimate_test])
+    shuffle_idx = X_test.sample(frac=1, random_state=random_state + 2).index
+    X_test = X_test.loc[shuffle_idx]
+    y_test = y_test.loc[shuffle_idx]
+
+    # Log split sizes
+    total = len(X)
+    logger.info(f"\nFinal BALANCED split sizes:")
+    logger.info(f"  Train: {len(X_train)} samples ({len(X_train)/total*100:.1f}%) - BALANCED 50/50")
+    logger.info(f"  Val:   {len(X_val)} samples ({len(X_val)/total*100:.1f}%) - BALANCED 50/50")
+    logger.info(f"  Test:  {len(X_test)} samples ({len(X_test)/total*100:.1f}%) - BALANCED 50/50")
+
+    # Log class distributions
+    logger.info(f"\nClass distribution:")
+    logger.info(f"  Train: {y_train.value_counts().to_dict()} (50/50)")
+    logger.info(f"  Val:   {y_val.value_counts().to_dict()} (50/50)")
+    logger.info(f"  Test:  {y_test.value_counts().to_dict()} (50/50)")
+
+    # Verify all sets are balanced
+    for name, y_split in [("Train", y_train), ("Val", y_val), ("Test", y_test)]:
+        balance = y_split.value_counts()
+        if len(balance) == 2 and balance.iloc[0] == balance.iloc[1]:
+            logger.info(f"✓ {name} set is perfectly balanced!")
+        else:
+            logger.warning(f"⚠ {name} set balance may be slightly off: {balance.to_dict()}")
 
     return X_train, X_val, X_test, y_train, y_val, y_test
 

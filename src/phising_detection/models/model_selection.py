@@ -19,7 +19,8 @@ def select_model(
     feature_group_name: str = "urlscan_features",
     feature_group_version: int = 1,
     val_size: float = 0.15,
-    test_size: float = 0.15
+    test_size: float = 0.15,
+    balanced_train_val: bool = True
 ) -> Tuple[Any, str, dict, StandardScaler]:
     """
     Select the best model for phishing detection.
@@ -36,6 +37,7 @@ def select_model(
         feature_group_version: Version of feature group
         val_size: Fraction for validation
         test_size: Fraction for testing
+        balanced_train_val: If True, create balanced (50/50) train and val sets (default: True)
 
     Returns:
         Tuple of (best_model, model_name, test_metrics, scaler)
@@ -54,7 +56,7 @@ def select_model(
     # Split WITHOUT normalization first
     X, y = data_prep.prepare_features(raw_data)
     X_train_raw, X_val_raw, X_test_raw, y_train, y_val, y_test = data_prep.split_data(
-        X, y, val_size=val_size, test_size=test_size
+        X, y, val_size=val_size, test_size=test_size, balanced_train_val=balanced_train_val
     )
 
     # Normalize the splits
